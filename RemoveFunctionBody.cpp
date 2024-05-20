@@ -1,5 +1,5 @@
-#include <RemoveFunctionBody.h>
 #include <llvm/Config/llvm-config-x86_64.h>
+#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Compiler.h>
 
@@ -10,53 +10,66 @@
 using namespace llvm;
 using namespace std;
 
-PreservedAnalyses RemoveFunctionBodyPass::run(Module &M,
-                                              ModuleAnalysisManager &MAM) {
-  int n_funcs = M.getFunctionList().size();
-  if (Index == -1) {
-    errs() << "n=" << n_funcs << '\n';
-    return PreservedAnalyses::all();
-  }
-  if (Index >= n_funcs || Index < -1) {
-    errs() << "Index is out of range! "
-           << "Index=" << Index << " n=" << n_funcs << "\n";
-    return PreservedAnalyses::all();
-  }
-
-  int count = -1;
-  for (Function &F : M) {
-    Function *fp = &F;
-    if (count == Index - 1) {
-      if (fp->isDeclaration()) {
-        return PreservedAnalyses::all();
-      }
-      std::vector<Use *> useList;
-      for (auto &use : fp->uses()) {
-        useList.push_back(&use);
-      }
-      for (auto &use : useList) {
-        if (isa<GlobalAlias>(use->getUser())) {
-          GlobalAlias *ga = cast<GlobalAlias>(use->getUser());
-          ga->replaceAllUsesWith(fp);
-          ga->eraseFromParent();
-        }
-      }
-      fp->deleteBody();
-      fp->setComdat(NULL);
+namespace {
+cl::list<int> Lists("lists", cl::desc("Specify function index"), cl::OneOrMore);
+struct RemoveFunctionBodyPass : PassInfoMixin<RemoveFunctionBodyPass> {
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
+    if (Lists.size() != 1) {
+      errs() << "There should be only 1 argument!\n";
+      return PreservedAnalyses::all();
     }
-    count++;
+
+    int Index = -2;
+    for (auto arg : Lists) {
+      Index = arg;
+    }
+    int n_funcs = M.getFunctionList().size();
+    if (Index == -1) {
+      errs() << "n=" << n_funcs << '\n';
+      return PreservedAnalyses::all();
+    }
+    if (Index >= n_funcs || Index < -1) {
+      errs() << "Index is out of range! "
+             << "Index=" << Index << " n=" << n_funcs << "\n";
+      return PreservedAnalyses::all();
+    }
+
+    int count = -1;
+    for (Function &F : M) {
+      Function *fp = &F;
+      if (count == Index - 1) {
+        if (fp->isDeclaration()) {
+          return PreservedAnalyses::all();
+        }
+        std::vector<Use *> useList;
+        for (auto &use : fp->uses()) {
+          useList.push_back(&use);
+        }
+        for (auto &use : useList) {
+          if (isa<GlobalAlias>(use->getUser())) {
+            GlobalAlias *ga = cast<GlobalAlias>(use->getUser());
+            ga->replaceAllUsesWith(fp);
+            ga->eraseFromParent();
+          }
+        }
+        fp->deleteBody();
+        fp->setComdat(NULL);
+      }
+      count++;
+    }
+    return PreservedAnalyses::none();
   }
-  return PreservedAnalyses::none();
-}
+};
+} // namespace
 
 /* New PM Registration */
 llvm::PassPluginLibraryInfo getRemoveFunctionBodyPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "RemoveFunctionBody", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
-            PB.registrerPipelineParsingCallback(
+            PB.registerPipelineParsingCallback(
                 [](StringRef Name, llvm::FunctionPassManager &FPM,
                    ArrayRef<llvm::PassBuilder::PipelineElement>) {
-                  if (Name == "remove-fn-body-alternative") {
+                  if (Name == "remove-fn-body") {
                     FPM.addPass(RemoveFunctionBodyPass());
                     return true;
                   }

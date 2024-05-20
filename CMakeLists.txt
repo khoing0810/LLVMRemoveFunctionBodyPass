@@ -18,7 +18,7 @@ endif()
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
-add_library(RemoveFunctionBody SHARED RemoveFunctionBodyPass.cpp)
+add_library(RemoveFunctionBody SHARED RemoveFunctionBody.cpp)
 target_link_libraries(RemoveFunctionBody "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 # separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
