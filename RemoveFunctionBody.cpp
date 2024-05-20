@@ -11,7 +11,7 @@ using namespace llvm;
 using namespace std;
 
 namespace {
-cl::list<int> Lists("lists", cl::desc("Specify function index"), cl::OneOrMore);
+cl::list<int> Lists("index", cl::desc("Specify function index"), cl::OneOrMore);
 struct RemoveFunctionBodyPass : PassInfoMixin<RemoveFunctionBodyPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     if (Lists.size() != 1) {
@@ -67,10 +67,10 @@ llvm::PassPluginLibraryInfo getRemoveFunctionBodyPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "RemoveFunctionBody", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
-                [](StringRef Name, llvm::FunctionPassManager &FPM,
+                [](StringRef Name, llvm::ModulePassManager &MPM,
                    ArrayRef<llvm::PassBuilder::PipelineElement>) {
                   if (Name == "remove-fn-body") {
-                    FPM.addPass(RemoveFunctionBodyPass());
+                    MPM.addPass(RemoveFunctionBodyPass());
                     return true;
                   }
                   return false;
